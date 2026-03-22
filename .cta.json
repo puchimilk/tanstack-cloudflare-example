@@ -11,6 +11,7 @@
   "envVarValues": {},
   "routerOnly": false,
   "version": 1,
+  "addOns": true,
   "framework": "react",
-  "chosenAddOns": []
+  "chosenAddOns": ["nitro"]
 }
