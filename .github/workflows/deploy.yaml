@@ -1,0 +1,86 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          cache: 'npm'
+          node-version-file: '.node-version'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: List build output
+        run: find .output -type f | sort
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          include-hidden-files: true
+          name: dist
+          path: .output/
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Cloudflare Workers
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            .node-version
+            .npmrc
+            package-lock.json
+            package.json
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          cache: 'npm'
+          node-version-file: '.node-version'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: .output/
+
+      - name: Check wrangler version
+        run: npx wrangler --version
+
+      - name: Deploy to Cloudflare Workers
+        id: deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler deploy --config .output/server/wrangler.json
